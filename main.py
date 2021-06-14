@@ -1,7 +1,8 @@
 import os
 import click
 from pathlib import Path
-from github import Github
+from github import Github, BadCredentialsException, UnknownObjectException
+
 
 token_file_path = os.path.join(Path.home(), ".gh-cli")
 token_file_name = os.path.join(token_file_path, "token")
@@ -18,8 +19,21 @@ def auth(token):
     verify = True
     retry = None
     pool_size = None
-    gh = Github(login_or_token)
-    print("You are logged as", gh.get_user().login)
+    gh = Github(login_or_token,
+                password,
+                jwt,
+                base_url,
+                timeout,
+                user_agent,
+                per_page,
+                verify,
+                retry,
+                pool_size)
+    try:
+        print("You are logged as {0}".format(gh.get_user().login))
+    except BadCredentialsException:
+        print("Bad credentials")
+        return None
     return gh
 
 
@@ -60,8 +74,9 @@ def get_repo_list():
     token = get_token_from_file()
     if token is not None:
         gh = auth(token)
-        for repo in gh.get_user().get_repos():
-            print(repo.name)
+        if gh is not None:
+            for repo in gh.get_user().get_repos():
+                print(repo.name)
 
 
 @cli.command(name="workflow", short_help="List workflow of repo")
@@ -70,9 +85,13 @@ def get_workflow_list(repo_name):
     token = get_token_from_file()
     if token is not None:
         gh = auth(token)
-        print("Workflow list repo {0}".format(repo_name))
-        for workflow in gh.get_user().get_repo(repo_name).get_workflows():
-            print(workflow.name)
+        if gh is not None:
+            try:
+                print("Workflow list repo {0}".format(repo_name))
+                for workflow in gh.get_user().get_repo(repo_name).get_workflows():
+                    print(workflow.name)
+            except UnknownObjectException:
+                print("Not found")
 
 
 if __name__ == "__main__":
